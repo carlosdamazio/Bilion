@@ -1,5 +1,6 @@
 #include <bits/types.h>
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +20,7 @@ void clear_array(char* arr)
 Token* lex(char *line)
 {
     Token *tokens = malloc(sizeof(Token) * 256);
+    bool is_string = false;
     char delim_stack[10];
     char buff[256];
     int counter = 0;
@@ -35,9 +37,9 @@ Token* lex(char *line)
             continue;
         
         // String literal check
-        if (buff[0] == '"' && line[i] != '"') {
-            buff[counter] = line[i];
-            counter++;
+        if (is_string && line[i] != '"') {
+            buff[counter++] = line[i];
+            continue;
         }
 
         // Keyword check
@@ -78,18 +80,16 @@ Token* lex(char *line)
                 break;
             }
             case '"': {
-                if (buff[0] != '"') {
-                    buff[counter] = line[i];
-                    counter++;
+                if (is_string) {
                     char *value = malloc(sizeof(char) * counter);
                     strncpy(value, buff, counter);
                     Token token = {TOK_STRING, value};
                     tokens[token_counter++] = token;
+                    clear_array(buff);
                     free(value);
-                } else {
-                    buff[counter] = line[i];
-                    counter++;
+                    counter = 0;
                 }
+                is_string = !is_string;
                 break;
             }
         }
