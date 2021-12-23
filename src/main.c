@@ -34,7 +34,7 @@ int main (int argc, char *argv[])
             tokens++;
         }
         tokens = start;
-        free(tokens);
+        free_tokens(tokens);
     }
 
     fclose(file);

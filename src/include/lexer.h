@@ -1,4 +1,4 @@
-#define LEX_CAP 256
+#define LEX_CAP 1024
 
 enum token_sentinels {
     // file related tokens
@@ -20,9 +20,10 @@ enum token_sentinels {
 };
 
 typedef struct {
-    int kind;
-    char *value;
+    int        kind;
+    char       *value;
 } Token;
 
+
+void free_tokens(Token *tokens);
 Token* lex(char *line);
-void clear_array(char *arr);
