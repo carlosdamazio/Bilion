@@ -7,6 +7,30 @@
 
 #include "lexer.h"
 
+static char* initialize_buffer()
+{
+    static char buff[LEX_CAP];
+    buff[LEX_CAP-1] = '\0';
+    return buff;
+}
+
+static void reset_buffer(char buff[], int *counter)
+{
+    buff[0] = '\0';
+    *counter = 0;
+}
+
+static Token new_tok(int kind, char *buff, int counter, int lineno, int pos)
+{
+    Token token;
+    token.kind = kind;
+    token.lineno = lineno;
+    token.pos = pos;
+    token.value = malloc(sizeof(char) * LEX_CAP);
+    strncpy(token.value, buff, counter);
+    return token;
+}
+
 void free_tokens(Token *tokens)
 {
     Token *start = tokens;
@@ -19,16 +43,16 @@ void free_tokens(Token *tokens)
 }
 
 // This function lexes a line into an array of tokens, with type and value.
-Token* lex(char *line)
+Token* lex(char *line, int lineno)
 {
     Token *tokens = malloc(sizeof(Token) * LEX_CAP);
+    Token *delim_stack = malloc(sizeof(Token) * 10);
+    Token *delim_stack_start = delim_stack;
+    char *buff = initialize_buffer();
     bool is_string = false;
-    char delim_stack[10];
-    char buff[LEX_CAP];
-    buff[LEX_CAP-1] = '\0';
+    
     int counter = 0;
     int token_counter = 0;
-    int delim_tracker = 0;
 
     if (tokens == NULL) {
         fprintf(stderr, "[ERROR] Couldn't allocate memory for token array");
@@ -51,12 +75,8 @@ Token* lex(char *line)
             buff[counter++] = line[i];
             // see if identifier is a keyword, and reset it afterwards
             if (strcmp(buff, "exposed") == 0) {
-                Token token;
-                token.kind = TOK_PRINT;
-                token.value = malloc(sizeof(char) * 1024);
-                strncpy(token.value, buff, counter);
-                buff[0] = '\0';
-                counter = 0;
+                Token token = new_tok(TOK_PRINT, buff, counter, lineno, i); 
+                reset_buffer(buff, &counter);
                 tokens[token_counter++] = token;
             }
             continue;
@@ -66,51 +86,50 @@ Token* lex(char *line)
         switch (line[i]) {
             case ';': {
                 buff[counter++] = line[i];
-                Token token;
-                token.kind = TOK_END_EXPR_DELIM;
-                token.value = malloc(sizeof(char) * 1024);
-                strncpy(token.value, buff, counter);
-                buff[0] = '\0';
-                counter = 0;
+                Token token = new_tok(TOK_END_EXPR_DELIM, buff, counter, lineno,
+                                      i);
+                reset_buffer(buff, &counter);
                 tokens[token_counter++] = token;
+                
+                if (delim_stack != NULL) {
+                    fprintf(stderr, "[ERROR] line:%d:%d -  Unmatching delimiter\n",
+                            lineno, delim_stack->pos);
+                    free_tokens(tokens);
+                    free(delim_stack_start);
+                    return NULL;
+                }
                 return tokens;
             }
             case '(': {
                 buff[counter++] = line[i];
-                Token token;
-                token.kind = TOK_PAREN_OPEN_DELIM;
-                token.value = malloc(sizeof(char) * 1024);
-                strncpy(token.value, buff, counter);
-                buff[0] = '\0';
-                counter = 0;
+                Token token = new_tok(TOK_PAREN_OPEN_DELIM, buff, counter,
+                                      lineno, i);
+                reset_buffer(buff, &counter);
                 tokens[token_counter++] = token;
-                delim_stack[delim_tracker] = line[i];
+                delim_stack = &token;
+                delim_stack++;
                 break;
             }
             case ')': {
                 buff[counter++] = line[i];
-                if (delim_stack[delim_tracker] != '(') {
-                    fprintf(stderr, "[ERROR] Expected to close expression\n");
+                if (strcmp(delim_stack->value,"(") != 0) {
+                    fprintf(stderr, "[ERROR] line:%d:%ld - Expected to match delimiters\n", lineno, i);
+                    free_tokens(tokens);
+                    free(delim_stack_start);
                     return NULL;
                 }
-                Token token;
-                token.kind = TOK_PAREN_CLOSE_DELIM;
-                token.value = malloc(sizeof(char) * 1024);
-                strncpy(token.value, buff, counter);
-                buff[0] = '\0';
-                counter = 0;
+                Token token = new_tok(TOK_PAREN_CLOSE_DELIM, buff, counter, 
+                                      lineno, i);
+                reset_buffer(buff, &counter);
                 tokens[token_counter++] = token;
-                delim_stack[--delim_tracker] = 0;
+                delim_stack--;
+                delim_stack = NULL;
                 break;
             }
             case '"': {
                 if (is_string) {
-                    Token token;
-                    token.kind = TOK_STRING;
-                    token.value = malloc(sizeof(char) * 1024);
-                    strncpy(token.value, buff, counter);
-                    buff[0] = '\0';
-                    counter = 0;
+                    Token token = new_tok(TOK_STRING, buff, counter, lineno, i);
+                    reset_buffer(buff, &counter);
                     tokens[token_counter++] = token;
                 }
                 is_string = !is_string;
@@ -119,5 +138,7 @@ Token* lex(char *line)
         }
     }
 
+    free(delim_stack_start);
     return tokens;
 }
+

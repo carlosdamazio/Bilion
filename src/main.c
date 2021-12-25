@@ -6,6 +6,7 @@
 int main (int argc, char *argv[])
 {
     char line [256];
+    int lineno = 0;
     
     if (argc < 2) {
         fprintf(stderr, "[ERROR] Provide enough arguments to compiler\n");
@@ -20,7 +21,7 @@ int main (int argc, char *argv[])
 
     // Lexical analysis
     while(fgets(line, sizeof(line), file)) {
-        Token *tokens = lex(line); 
+        Token *tokens = lex(line, ++lineno); 
         if (tokens == NULL) {
             fprintf(stderr, "[ERROR] Lexing error, exiting...\n");
             return 1;
@@ -30,7 +31,9 @@ int main (int argc, char *argv[])
         for (size_t i = 0; i < strlen(line); i++) {
             if (tokens->value == NULL)
                 break;
-            fprintf(stdout, "[DEBUG] Token = (%d, %s)\n",tokens->kind, tokens->value);
+            fprintf(stdout, "[DEBUG] Token = (type: %d, lineno: %d, pos: %d, "
+                            "value: %s)\n", tokens->kind, tokens->lineno,
+                                            tokens->pos, tokens->value);
             tokens++;
         }
         tokens = start;

@@ -21,9 +21,10 @@ enum token_sentinels {
 
 typedef struct {
     int        kind;
+    int        lineno;
+    int        pos;
     char       *value;
 } Token;
 
-
 void free_tokens(Token *tokens);
-Token* lex(char *line);
+Token* lex(char *line, int lineno);
