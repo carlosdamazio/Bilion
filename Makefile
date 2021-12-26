@@ -6,7 +6,10 @@ CFLAGS += -Wall -Werror -Wextra -pedantic --std=c11 -I$(INC) $(DEFS)
 INC	  = src/include
 SRC  := $(wildcard src/*.c)
 OBJS := billion
+
+.PHONY: all
+
 all: $(OBJS)
 
-$(OBJS): $(SRC)
-	$(CC) $(CFLAGS) $? -o $@
+$(OBJS):
+	$(CC) $(CFLAGS) $(SRC) -o $@
