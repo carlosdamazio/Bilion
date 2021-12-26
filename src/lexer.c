@@ -7,6 +7,12 @@
 
 #include "billion.h"
 
+static void print_pinned_err(char *line, int pos)
+{
+    fprintf(stderr, "[ERROR] %s", line);
+    fprintf(stderr, "[ERROR] %*s", pos, "");
+    fprintf(stderr, "^\n");
+}
 
 static char* initialize_buffer()
 {
@@ -97,10 +103,11 @@ Token* lex(FileInfo *fi, char *line)
                 tokens[token_counter++] = token;
                 
                 if (delim_index != 0) {
+                    print_pinned_err(line, delim_stack[delim_index-1].pos);
                     fprintf(stderr, "[ERROR] %s:%d:%d - Delimiter not closed\n",
                             fi->filename,
-                            delim_stack[delim_index].lineno,
-                            delim_stack[delim_index].pos+1);
+                            delim_stack[delim_index-1].lineno,
+                            delim_stack[delim_index-1].pos+1);
                     free_tokens(tokens);
                     return NULL;
                 }
@@ -118,6 +125,7 @@ Token* lex(FileInfo *fi, char *line)
             case ')': {
                 buff[counter++] = line[i];
                 if (strcmp(delim_stack[delim_index-1].value, "(") != 0) {
+                    print_pinned_err(line, delim_stack[delim_index-1].pos);
                     fprintf(stderr, "[ERROR] %s:%d:%d - Expected to match "
                             "delimiters\n", fi->filename,
                             delim_stack[delim_index-1].lineno, 
@@ -129,7 +137,7 @@ Token* lex(FileInfo *fi, char *line)
                                       fi->curr_line, i);
                 reset_buffer(buff, &counter);
                 tokens[token_counter++] = token;
-                delim_stack[--delim_index] = empty_tok;
+                delim_stack[delim_index--] = empty_tok;
                 break;
             }
             case '"': {
