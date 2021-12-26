@@ -30,4 +30,4 @@ typedef struct {
 static const Token empty_tok;
 
 void free_tokens(Token *tokens);
-Token* lex(char *line, int lineno);
+Token* lex(FileInfo *fi, char *line);

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "billion.h"
 
 int main (int argc, char *argv[])
@@ -19,11 +20,16 @@ int main (int argc, char *argv[])
         return 1;
     }
 
+    FileInfo *file_info = new_file_info(file, lineno); 
+
     // Lexical analysis
     while(fgets(line, sizeof(line), file)) {
-        Token *tokens = lex(line, ++lineno); 
+        file_info->curr_line++;
+        Token *tokens = lex(file_info, line); 
         if (tokens == NULL) {
             fprintf(stderr, "[ERROR] Lexing error, exiting...\n");
+            free_file_info(file_info);
+            fclose(file);
             return 1;
         }
         
@@ -40,6 +46,7 @@ int main (int argc, char *argv[])
         free_tokens(tokens);
     }
 
+    free_file_info(file_info);
     fclose(file);
     return 0;
 }

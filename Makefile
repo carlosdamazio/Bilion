@@ -1,9 +1,10 @@
 CC = gcc
 
-CFLAGS += -Wall -Werror -Wextra -pedantic --std=c11 -I$(INC)
+DEFS   += -D_POSIX_C_SOURCE=200809L
+CFLAGS += -Wall -Werror -Wextra -pedantic --std=c11 -I$(INC) $(DEFS)
 
 INC	  = src/include
-SRC  := src/main.c src/lexer.c
+SRC  := $(wildcard src/*.c)
 OBJS := billion
 all: $(OBJS)
 
