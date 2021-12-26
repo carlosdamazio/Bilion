@@ -46,12 +46,16 @@ void free_tokens(Token *tokens)
 Token* lex(char *line, int lineno)
 {
     Token *tokens = malloc(sizeof(Token) * LEX_CAP);
-    Token *delim_stack = malloc(sizeof(Token) * 10);
-    Token *delim_stack_start = delim_stack;
+    
+    /* Not using pointers due to new_tok returning a new variable from
+     same address, poluting the delimiter stack with incorrect
+     tokens.*/
+    Token delim_stack[10];
     char *buff = initialize_buffer();
     bool is_string = false;
     
     int counter = 0;
+    int delim_index = 0;
     int token_counter = 0;
 
     if (tokens == NULL) {
@@ -91,11 +95,10 @@ Token* lex(char *line, int lineno)
                 reset_buffer(buff, &counter);
                 tokens[token_counter++] = token;
                 
-                if (delim_stack != NULL) {
-                    fprintf(stderr, "[ERROR] line:%d:%d -  Unmatching delimiter\n",
+                if (delim_index != 0) {
+                    fprintf(stderr, "[ERROR] line:%d:%d - Delimiter not closed\n",
                             lineno, delim_stack->pos);
                     free_tokens(tokens);
-                    free(delim_stack_start);
                     return NULL;
                 }
                 return tokens;
@@ -106,24 +109,23 @@ Token* lex(char *line, int lineno)
                                       lineno, i);
                 reset_buffer(buff, &counter);
                 tokens[token_counter++] = token;
-                delim_stack = &token;
-                delim_stack++;
+                delim_stack[delim_index++] = token;
                 break;
             }
             case ')': {
                 buff[counter++] = line[i];
-                if (strcmp(delim_stack->value,"(") != 0) {
-                    fprintf(stderr, "[ERROR] line:%d:%ld - Expected to match delimiters\n", lineno, i);
+                if (strcmp(delim_stack[delim_index-1].value, "(") != 0) {
+                    fprintf(stderr, "[ERROR] line:%d:%d - Expected to match "
+                            "delimiters\n", delim_stack[delim_index-1].lineno, 
+                            delim_stack[delim_index-1].pos);
                     free_tokens(tokens);
-                    free(delim_stack_start);
                     return NULL;
                 }
                 Token token = new_tok(TOK_PAREN_CLOSE_DELIM, buff, counter, 
                                       lineno, i);
                 reset_buffer(buff, &counter);
                 tokens[token_counter++] = token;
-                delim_stack--;
-                delim_stack = NULL;
+                delim_stack[--delim_index] = empty_tok;
                 break;
             }
             case '"': {
@@ -138,7 +140,6 @@ Token* lex(char *line, int lineno)
         }
     }
 
-    free(delim_stack_start);
     return tokens;
 }
 
