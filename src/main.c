@@ -26,7 +26,7 @@ int main (int argc, char *argv[])
     while(fgets(line, sizeof(line), file)) {
         file_info->curr_line++;
         LexResult *result = lex(file_info, line); 
-        if (result->stack_trace != NULL) {
+        if (strcmp(result->stack_trace, STACK_TRACE_HEADER) != 0) {
             fprintf(stderr, "%s", result->stack_trace);
             fprintf(stderr, "[ERROR] Lexing error, exiting...\n");
             free_file_info(file_info);

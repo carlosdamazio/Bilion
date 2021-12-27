@@ -91,10 +91,9 @@ LexResult* lex(FileInfo *fi, char *line)
         fprintf(stderr, "[ERROR] Couldn't allocate memory for token array\n");
         return NULL;
     }
-
-    sprintf(buff, "===============STACK TRACE=================\n");
-    strcat(stack_trace, buff);
-    reset_buffer(buff, &counter);
+    
+    // Initialize stack trace header
+    strcat(stack_trace, STACK_TRACE_HEADER);
 
     for (size_t i = 0; i < strlen(line); i++) {
         char_counter++;
@@ -141,7 +140,8 @@ LexResult* lex(FileInfo *fi, char *line)
                 }
                 return new_result(stack_trace, tokens);
             }
-            case '(': {
+            case '(': { 
+                fprintf(stderr, "%s\n", buff);
                 buff[counter++] = line[i];
                 Token token = new_tok(buff, TOK_PAREN_OPEN_DELIM, counter,
                                       fi->curr_line, i);
