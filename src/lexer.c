@@ -141,7 +141,6 @@ LexResult* lex(FileInfo *fi, char *line)
                 return new_result(stack_trace, tokens);
             }
             case '(': { 
-                fprintf(stderr, "%s\n", buff);
                 buff[counter++] = line[i];
                 Token token = new_tok(buff, TOK_PAREN_OPEN_DELIM, counter,
                                       fi->curr_line, i);
