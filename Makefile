@@ -7,9 +7,12 @@ INC	  = src/include
 SRC  := $(wildcard src/*.c)
 OBJS := billion
 
-.PHONY: all
+.PHONY: all clean
 
 all: $(OBJS)
 
 $(OBJS):
 	$(CC) $(CFLAGS) $(SRC) -o $@
+
+clean: 
+	rm $(OBJS)
