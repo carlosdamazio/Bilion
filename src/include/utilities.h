@@ -1,3 +1,4 @@
+#ifndef UTILITIES_H
 #include <stdint.h>
 
 #define u8 uint8_t
@@ -9,4 +10,4 @@
 #define i16 int16_t
 #define i32 int32_t
 #define i64 int64_t
-
+#endif

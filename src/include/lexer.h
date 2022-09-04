@@ -1,6 +1,6 @@
+#ifndef LEXER_H
 #define LEX_CAP 1024
 #define STACK_TRACE_HEADER "==============STACK TRACE===============\n"
-
 
 // Token's possible states
 enum token_sentinels {
@@ -30,13 +30,18 @@ typedef struct {
 } Token;
 
 typedef struct {
-    Token  *tokens;
-    char   *stack_trace;
-} LexResult;
+    Token     delim_stack[10];
+    char      *buffer;
+    int       buffer_sz;
+    char      *stack_trace;
+    int       stack_trace_sz;
+    Token     *tokens;
+    int       tokens_sz;
+} Lexer;
 
-// Token to reset delimiters
 static const Token empty_tok;
-// Functions prototypes of lexer.c
-void        free_tokens(Token *tokens);
-void        free_lex_result(LexResult *result);
-LexResult*  lex(FileInfo *fi, char *line);
+
+void   free_tokens(Token *tokens);
+void   free_lexer(Lexer *lexer);
+Lexer* lex(FileInfo *fi, char *line);
+#endif
