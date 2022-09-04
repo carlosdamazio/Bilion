@@ -164,7 +164,7 @@ lex(FileInfo *fi, char *line)
             case ')': {
                 lexer->buffer[counter++] = line[i];
                 lexer->buffer[counter] = '\0';
-                if (strcmp(lexer->delim_stack[delim_index-1].value, "(") != 0) {
+                if (delim_index == 0 || strcmp(lexer->delim_stack[delim_index-1].value, "(") != 0) {
                     lex_error(lexer, "expected to match delimiters\n", line, fi, counter, delim_index);
                     continue;
                 }
