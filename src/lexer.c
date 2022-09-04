@@ -7,99 +7,117 @@
 
 #include "billion.h"
 
-static void print_pinned_err(char *line, int pos)
+static void
+print_pinned_err(char *line, int pos)
 {
     fprintf(stderr, "[ERROR] %s", line);
     fprintf(stderr, "[ERROR] %*s", pos, "");
     fprintf(stderr, "^\n");
 }
 
-static char* initialize_buffer()
+static void
+reset_buffer(Lexer *lexer, int *counter)
 {
-    static char buff[LEX_CAP];
-    buff[LEX_CAP-1] = '\0';
-    return buff;
-}
-
-static char* initialize_stack_trace()
-{
-    static char stack_trace[LEX_CAP];
-    stack_trace[LEX_CAP-1] = '\0';
-    return stack_trace;
-}
-
-static void reset_buffer(char buff[], int *counter)
-{
-    buff[0] = '\0';
+    for (int i = 0; i < lexer->buffer_sz; i++) {
+        lexer->buffer[i] = ' ';
+    }
     *counter = 0;
+    lexer->buffer[*counter] = '\0';
 }
 
-static LexResult* new_result(char* stack_trace, Token* tokens)
-{
-    LexResult *result = malloc(sizeof(LexResult));
-    result->stack_trace = malloc(sizeof(char) * LEX_CAP);
-    strcpy(result->stack_trace, stack_trace);
-    result->tokens = tokens;
-    return result;
-}
-
-static Token new_tok(char *buff, int kind, int counter, int lineno, int pos)
+static Token
+new_tok(char *buff, int kind, int lineno, int pos)
 {
     Token token;
     token.kind = kind;
     token.lineno = lineno;
     token.pos = pos;
     token.value = malloc(sizeof(char) * LEX_CAP);
-    strncpy(token.value, buff, counter);
+    for (int i = 0; i < LEX_CAP; i++) {
+        token.value[i] = ' ';
+    }
+    token.value[0] = '\0';
+    strcpy(token.value, buff);
     return token;
 }
 
-void free_lex_result(LexResult *result)
-{
-    free(result->stack_trace);
-    free_tokens(result->tokens);
-    free(result);
+static Lexer*
+new_lexer(void) {
+    Lexer *lexer = malloc(sizeof(Lexer));
+    lexer->buffer = malloc(sizeof(char)*LEX_CAP);
+    lexer->buffer_sz = LEX_CAP;
+    for (int i = 0; i < LEX_CAP; i++) {
+        lexer->buffer[i] = ' ';
+    }
+    lexer->buffer[0] = '\0';
+
+    lexer->stack_trace = malloc(sizeof(char)*LEX_CAP);;
+    lexer->stack_trace_sz = LEX_CAP;
+    for (int i = 0; i < LEX_CAP; i++) {
+        lexer->stack_trace[i] = ' ';
+    }
+    lexer->stack_trace[0] = '\0';
+
+    lexer->tokens = malloc(sizeof(Token)*LEX_CAP);
+    for (int i = 0; i < LEX_CAP; i++) {
+        lexer->tokens[i] = empty_tok;
+    }
+
+    return lexer;
 }
 
-void free_tokens(Token *tokens)
+void
+free_tokens(Token *tokens)
 {
-    Token *start = tokens;
-    while(tokens->value != NULL)
-        free(tokens++->value);
-    free(start);
+    for (int i = 0; i < LEX_CAP; i++) {
+        free(tokens[i].value);
+    }
+    free(tokens);
+}
+
+void
+free_lexer(Lexer *lexer)
+{
+    free_tokens(lexer->tokens);
+    free(lexer->buffer);
+    free(lexer->stack_trace);
+    free(lexer);
+}
+
+void
+lex_error(Lexer *lexer, const char *msg, char *line, FileInfo *fi, int counter, int delim_index) {
+    print_pinned_err(line, lexer->delim_stack[delim_index-1].pos);
+    sprintf(lexer->buffer,
+            "[ERROR] %s:%d:%d - %s\n",
+            fi->filename,
+            lexer->delim_stack[delim_index-1].lineno,
+            lexer->delim_stack[delim_index-1].pos+1,
+            msg);
+    strcat(lexer->stack_trace, lexer->buffer);
+    reset_buffer(lexer, &counter);
 }
 
 // This function lexes a line into an array of tokens, with type and value.
-LexResult* lex(FileInfo *fi, char *line)
+Lexer*
+lex(FileInfo *fi, char *line)
 {
-    Token *tokens = malloc(sizeof(Token) * LEX_CAP);
-    
-    /* Not using pointers due to new_tok returning a new variable from
-     same address, poluting the delimiter stack with incorrect
-     tokens.*/
-    Token delim_stack[10];
-    char *buff = initialize_buffer();
-    char *stack_trace = initialize_stack_trace();
     bool is_string = false;
-    
-    int counter = 0;
-    int delim_index = 0;
-    int token_counter = 0;
-    int char_counter = 0;
+    int counter, delim_index, token_counter = 0;
 
-    if (tokens == NULL) {
-        fprintf(stderr, "[ERROR] Couldn't allocate memory for token array\n");
+    Lexer *lexer = new_lexer();
+    if (lexer == NULL) {
+        fprintf(stderr, "[ERROR] couldn't create lexer\n");
         return NULL;
     }
     
     // Initialize stack trace header
-    strcat(stack_trace, STACK_TRACE_HEADER);
+    strcat(lexer->stack_trace, STACK_TRACE_HEADER);
 
     for (size_t i = 0; i < strlen(line); i++) {
-        char_counter++;
         // String literal check
         if (is_string && line[i] != '"') {
-            buff[counter++] = line[i];
+            lexer->buffer[counter++] = line[i];
+            lexer->buffer[counter] = '\0';
             continue;
         }
         
@@ -109,12 +127,13 @@ LexResult* lex(FileInfo *fi, char *line)
         
         // Keyword check
         if (isalpha(line[i])) {
-            buff[counter++] = line[i];
+            lexer->buffer[counter++] = line[i];
+            lexer->buffer[counter] = '\0';
             // see if identifier is a keyword, and reset it afterwards
-            if (strcmp(buff, "exposed") == 0) {
-                Token token = new_tok(buff, TOK_PRINT, counter, fi->curr_line, i); 
-                reset_buffer(buff, &counter);
-                tokens[token_counter++] = token;
+            if (strcmp(lexer->buffer, "exposed") == 0) {
+                Token token = new_tok(lexer->buffer, TOK_PRINT, counter, fi->curr_line);
+                reset_buffer(lexer, &counter);
+                lexer->tokens[token_counter++] = token;
             }
             continue;
         }
@@ -122,102 +141,63 @@ LexResult* lex(FileInfo *fi, char *line)
         // Delimiters check
         switch (line[i]) {
             case ';': {
-                buff[counter++] = line[i];
-                Token token = new_tok(buff, TOK_END_EXPR_DELIM, counter, 
-                                      fi->curr_line, i);
-                reset_buffer(buff, &counter);
-                tokens[token_counter++] = token;
+                lexer->buffer[counter++] = line[i];
+                lexer->buffer[counter] = '\0';
+                Token token = new_tok(lexer->buffer, TOK_END_EXPR_DELIM, counter,fi->curr_line);
+                reset_buffer(lexer, &counter);
+                lexer->tokens[token_counter++] = token;
 
                 if (delim_index != 0) {
-                    print_pinned_err(line, delim_stack[delim_index-1].pos);
-                    sprintf(buff,
-                            "[ERROR] %s:%d:%d - Delimiter not closed\n",
-                            fi->filename,
-                            delim_stack[delim_index-1].lineno,
-                            delim_stack[delim_index-1].pos+1);
-                    strcat(stack_trace, buff);
-                    reset_buffer(buff, &counter);
+                    lex_error(lexer, "delimiter not closed", line, fi, counter, delim_index);
                 }
-                return new_result(stack_trace, tokens);
+
+                return lexer;
             }
-            case '(': { 
-                buff[counter++] = line[i];
-                Token token = new_tok(buff, TOK_PAREN_OPEN_DELIM, counter,
-                                      fi->curr_line, i);
-                reset_buffer(buff, &counter);
-                tokens[token_counter++] = token;
-                delim_stack[delim_index++] = token;
+            case '(': {
+                lexer->buffer[counter++] = line[i];
+                lexer->buffer[counter] = '\0';
+                Token token = new_tok(lexer->buffer, TOK_PAREN_OPEN_DELIM, counter,fi->curr_line);
+                lexer->tokens[token_counter++] = token;
+                lexer->delim_stack[delim_index++] = token;
                 break;
             }
             case ')': {
-                buff[counter++] = line[i];
-                if (strcmp(delim_stack[delim_index-1].value, "(") != 0) {
-                    print_pinned_err(line, delim_stack[delim_index-1].pos);
-                    sprintf(buff,
-                            "[ERROR] %s:%d:%d - Expected to match delimiters\n",
-                            fi->filename,
-                            delim_stack[delim_index-1].lineno, 
-                            delim_stack[delim_index-1].pos);
-                    strcat(stack_trace, buff);
-                    reset_buffer(buff, &counter);
+                lexer->buffer[counter++] = line[i];
+                lexer->buffer[counter] = '\0';
+                if (strcmp(lexer->delim_stack[delim_index-1].value, "(") != 0) {
+                    lex_error(lexer, "expected to match delimiters\n", line, fi, counter, delim_index);
                     continue;
                 }
-                Token token = new_tok(buff, TOK_PAREN_CLOSE_DELIM, counter, 
-                                      fi->curr_line, i);
-                reset_buffer(buff, &counter);
-                tokens[token_counter++] = token;
-                delim_stack[delim_index--] = empty_tok;
+                Token token = new_tok(lexer->buffer, TOK_PAREN_CLOSE_DELIM, counter,fi->curr_line);
+                lexer->tokens[token_counter++] = token;
+                lexer->delim_stack[delim_index--] = empty_tok;
                 break;
             }
             case '"': {
                 if (is_string) {
-                    Token token = new_tok(buff, TOK_STRING, counter,
-                                          fi->curr_line, i);
-                    reset_buffer(buff, &counter);
-                    tokens[token_counter++] = token;
+                    Token token = new_tok(lexer->buffer, TOK_STRING, counter, fi->curr_line);
+                    lexer->tokens[token_counter++] = token;
                 }
                 is_string = !is_string;
                 break;
             }
             default: {
-                Token token = new_tok(buff, TOK_INVALID, counter, fi->curr_line,
-                                      i);
-                reset_buffer(buff, &counter);
-                tokens[token_counter++] = token;
-                print_pinned_err(line, delim_stack[delim_index-1].pos);
-                sprintf(buff,
-                        "[ERROR] %s:%d:%d - Unknown token \"%s\" ",
-                        fi->filename,
-                        delim_stack[delim_index-1].lineno, 
-                        delim_stack[delim_index-1].pos,
-                        token.value);
-                strcat(stack_trace, buff);
-                reset_buffer(buff, &counter);
+                Token token = new_tok(lexer->buffer, TOK_INVALID, counter, fi->curr_line);
+                lexer->tokens[token_counter++] = token;
+                lex_error(lexer, "unknown token", line, fi, counter, delim_index);
             }
         }
+        reset_buffer(lexer, &counter);
     }
-    
+
     if (delim_index != 0) {
-        print_pinned_err(line, delim_stack[delim_index-1].pos);
-        sprintf(buff,
-                "[ERROR] %s:%d:%d - Delimiter not closed\n",
-                fi->filename,
-                delim_stack[delim_index-1].lineno,
-                delim_stack[delim_index-1].pos+1);
-        strcat(stack_trace, buff);
-        reset_buffer(buff, &counter);
+        lex_error(lexer, "delimiter not closed", line, fi, counter, delim_index);
     }
 
-    if (tokens[token_counter-1].kind != TOK_END_EXPR_DELIM) {
-        print_pinned_err(line, tokens[token_counter-1].pos);
-        sprintf(buff,
-                "[ERROR] %s:%d:%d - Missing end of expression delimiter\n",
-                fi->filename,
-                tokens[token_counter-1].lineno, 
-                tokens[token_counter-1].pos);
-        strcat(stack_trace, buff);
+    if (lexer->tokens[token_counter-1].kind != TOK_END_EXPR_DELIM) {
+        lex_error(lexer, "no end of expr delimiter", line, fi, counter, delim_index);
     }
 
-    return new_result(stack_trace, tokens);
+    return lexer;
 }
 

@@ -25,30 +25,27 @@ int main (int argc, char *argv[])
     // Lexical analysis
     while(fgets(line, sizeof(line), file)) {
         file_info->curr_line++;
-        LexResult *result = lex(file_info, line); 
-        if (strcmp(result->stack_trace, STACK_TRACE_HEADER) != 0) {
-            fprintf(stderr, "%s", result->stack_trace);
+        Lexer *lexer = lex(file_info, line);
+        if (strcmp(lexer->stack_trace, STACK_TRACE_HEADER) != 0) {
+            fprintf(stderr, "%s", lexer->stack_trace);
             fprintf(stderr, "[ERROR] Lexing error, exiting...\n");
             free_file_info(file_info);
-            free_lex_result(result);
+            free_lexer(lexer);
             fclose(file);
             return 1;
         }
         
-        Token *start = result->tokens;
         for (size_t i = 0; i < strlen(line); i++) {
-            if (result->tokens->value == NULL)
+            if (lexer->tokens[i].value == NULL)
                 break;
             fprintf(stdout, "[DEBUG] Token = (type: %d, lineno: %d, pos: %d, "
                             "value: %s)\n",
-                            result->tokens->kind,
-                            result->tokens->lineno,
-                            result->tokens->pos,
-                            result->tokens->value);
-            result->tokens++;
+                            lexer->tokens[i].kind,
+                            lexer->tokens[i].lineno,
+                            lexer->tokens[i].pos,
+                            lexer->tokens[i].value);
         }
-        result->tokens = start;
-        free(result->stack_trace);
+        free_lexer(lexer);
     }
 
     free_file_info(file_info);

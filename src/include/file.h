@@ -1,3 +1,4 @@
+#ifndef FILE_H
 #include <stdio.h>
 
 typedef struct {
@@ -8,3 +9,4 @@ typedef struct {
 
 void      free_file_info(FileInfo *fi);
 FileInfo* new_file_info(FILE *fp, int curr_line);
+#endif
